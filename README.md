@@ -90,3 +90,19 @@ Today `physics_tot_train.py` carries its own inline torch total-arithmetic; unif
 ## License
 
 Zero-Clause BSD (0BSD). See `LICENSE`. Do whatever you want; no attribution required.
+
+### Integration step 1 (2026-07-21): audited totalization core vendored
+
+`cuda_total.py` is vendored **byte-identical** from
+[total-arith-cuda](https://github.com/PureTearsDropped/total-arith-cuda) (verify with `diff`;
+same pattern as robust-attitude-control). The forward totalization in `physics_tot_train.py`
+now DELEGATES to the audited `_sat` (5 external audit rounds + semantic flag oracle) instead
+of a hand-rolled copy — and the switch was motivated by a real hole the conformance check
+found: **the old hand-rolled `sat` passed NaN through** (`a > MAX` is False for NaN), so a
+`0×inf` upstream would have violated the "never NaN" banner. The audited core names it:
+NaN → (0, no-bound+SUNK). What stays hand-written on purpose: `SatDiv`'s **totalized
+backward** (gradient flags) — this repo's contribution, outside the core's scope; its value
+semantics are checked against `cuda_total.tot_div` (4096 cases incl. 585 divisions by zero,
+exact match). Run `python conformance_tot.py` for the permanent regression; the full 3-arm
+experiment reproduces identically after the switch (IEEE 8/8 dead / TOT+mask median 0.009,
+flags 4/4 hit, 0 false).

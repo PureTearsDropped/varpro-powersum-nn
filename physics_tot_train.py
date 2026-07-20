@@ -25,17 +25,18 @@ MAX = torch.finfo(F32).max
 MIN = torch.finfo(F32).tiny
 GE, LE = 1, 2
 
+# 監査済みの 全域化核を バイト同一 vendor(cuda_total.py, diff で 検証可・
+# robust-attitude-control と 同じ 前例)。順伝播の 全域化は これに 委譲する。
+from cuda_total import _sat as _audited_sat
+
 
 def sat(raw, flag_acc):
-    """全域化: 溢れ→±MAX(GE)・潰れ→±MIN=ε(LE)。フラグを 蓄積。勾配は 非飽和枝を 流れる。"""
-    sign = torch.sign(raw.detach())
-    a = raw.abs()
-    over = (a > MAX) | torch.isinf(raw)
-    under = (a > 0) & (a < MIN)
-    out = torch.where(over, sign * MAX, raw)
-    out = torch.where(under, sign * MIN, out)
-    flag_acc |= over.to(torch.uint8) * GE
-    flag_acc |= under.to(torch.uint8) * LE
+    """全域化 — vendored cuda_total(5ラウンド外部監査+意味論オラクル済)の _sat に 委譲。
+       旧手書き版は **NaN を 素通しした**(a>MAX が NaN で False になるため — 監査済み核との
+       照合で 発覚)。_sat は NaN→(0, 境界なし+SUNK) に 名指しする。where 連鎖なので
+       autograd 透過・飽和枝は sign 経由で 勾配 0(旧版と 同じ 勾配意味論)。"""
+    out, f = _audited_sat(raw, raw.device)
+    flag_acc |= f
     return out, flag_acc
 
 def _safe_div_val(num, den):
