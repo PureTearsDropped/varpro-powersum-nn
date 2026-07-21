@@ -72,6 +72,32 @@ $$\hat y = \sum_{k} c_k \prod_i x_i^{\,w_{ik}}$$
 
 ---
 
+## `implicit_fnn.py` — the left-hand side as a teacher / 左辺=0 を先生にする
+
+`implicit_discovery` finds laws `Θ·c = 0` in data; this experiment turns that left-hand
+side into a **loss** and teaches neural nets with it (VarPro split: the inner `c` is solved
+exactly by nullspace, the outer net descends the residual). Measured, 8 seeds:
+
+- **Phase A — laws as the only teacher (0 supervised points).** An MLP trained solely on
+  the functional equation `f(x+y)=f(x)f(y)` (+1 anchor) becomes `exp` (sup err 1.8e-2);
+  d'Alembert's `f(x+y)+f(x−y)=2f(x)f(y)` becomes `cos` (1.4e-3) — but **only with a
+  negative-valued anchor**: with a positive anchor alone the net escapes to the `cosh`
+  branch (measured sup err 1.0 = cosh(1)−cos(1)). Square-blind laws cannot choose their
+  branch; branch selection is the anchor's job. **The law bridge**: out-of-domain values
+  reduced into the trained domain via the law (`f(3)=f(3/4)⁴`) beat naive extrapolation
+  16.2 → 0.57 absolute error at z=3.
+- **Phase B — a discovered law as a semi-supervised teacher.** For `E=√(m²+p²)`: discover
+  `c` from N noisy labels (N=8 already gives the law with gap 74), freeze it, and penalize
+  `|Θ̃(m,p,ĝ(m,p))·c|²` on unlabeled points. Median test RMSE improves ~2–2.8× at every
+  N ∈ {8, 32, 128}; the worst seed at N=32 improves 0.043 → 0.011. Honest negatives: at
+  N=8 the noisy law can hurt the worst seed (0.14 → 0.17), and even the *oracle* law
+  diverges in one N=8 seed (E² is sign-blind — the same branch problem as cosh, again
+  cured by labels/anchors).
+- **Phase C — contaminated unlabeled set (5% Inf/NaN + 2.5% huge values).** IEEE
+  pass-through: training dead **8/8 seeds**. Entry+library-stage flag exclusion (the
+  total-arithmetic customs): dead **0/8**, median RMSE identical to the uncontaminated
+  run (0.0086 = 0.0086).
+
 ## Roadmap
 
 The three repositories below are, in effect, **three backends of one total-arithmetic contract** (CPU / GPU / hardware). A planned next step is a **pluggable backend** so this model can run its total arithmetic on any of them:
