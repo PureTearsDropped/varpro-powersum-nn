@@ -106,3 +106,15 @@ semantics are checked against `cuda_total.tot_div` (4096 cases incl. 585 divisio
 exact match). Run `python conformance_tot.py` for the permanent regression; the full 3-arm
 experiment reproduces identically after the switch (IEEE 8/8 dead / TOT+mask median 0.009,
 flags 4/4 hit, 0 false).
+
+### `implicit_discovery.py` — implicit law discovery (Python twin of total-arith-cuda's julia/Discovery.jl)
+
+Laws as `Σc·(monomials/derivatives) = 0`, solved as the null space (one SVD, gradient-free,
+seed-free). Born from the observation that y=f(x) explicit regression hits a composition
+wall at relativity's γ=(1−v²)^{-1/2}, while the implicit form makes it polynomial. Pipeline:
+audited `Tot` entry names poison (flags decide, float64 values keep precision) → flag-row
+exclusion → library → SVD → gap judgment → tautology detector (evaluate the found law on
+physics-free random data — still zero ⟹ learned nothing). Regression-tested trophies:
+E²=m²+p² and γ²(1−v²)=1 at ±1.000000; poisoned hydrogen where naive SVD dies → E=−0.500000
+rescued; honest refusal on lawless data; complex support — the free Schrödinger equation's
+imaginary unit discovered as a coefficient (ψ_xx/ψ_t = −0.5003i).
