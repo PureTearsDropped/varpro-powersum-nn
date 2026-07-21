@@ -108,6 +108,31 @@ exactly by nullspace, the outer net descends the residual). Measured, 8 seeds:
   zero false positives** — including the `1e200` rows that float64 `isfinite` passes
   (finite in f64, outside the float32 total-number domain → `±MAX+GE` at entry).
 
+## `implicit_embedding.py` — axioms as unlabeled teachers / 公理を無ラベルの先生に
+
+Known result (measured before, repeatedly): imposing structure on a free net's
+**architecture** is neutral or harmful. New question: what if the same structure is imposed
+as a **law in the loss** (the implicit left-hand side)? Task: ℤ/16 addition as next-token
+prediction (tied embedding + MLP composer), labels for only a fraction of the 256 pairs;
+the group **axioms** — commutativity, associativity, identity — applied as functional-
+equation losses on *unlabeled* pairs. Measured (8 seeds, AdamW + weight decay, both arms
+identical):
+
+| labeled frac | baseline (median/worst) | + axioms (median/worst) |
+|---|---|---|
+| 0.15 | 0.009 / 0.000 | **0.252** / 0.225 |
+| 0.30 | 0.000 / 0.000 | **0.356** / 0.328 |
+| 0.50 | 0.000 / 0.000 | **0.570** / 0.477 |
+
+The baseline memorizes and never generalizes (below chance = 1/16); the axiom teacher
+lifts every seed. Structure imposed as *law-in-the-loss* wins exactly where structure
+imposed as *architecture* loses — consistent with the matching-structure × scarce-data
+rule, at a new site of imposition. Second half: the discovery machine pointed at the
+learned embedding table honestly **refuses** the additive law `E[a]+E[b]=E[a+b]`
+(gap 1.0 — the learned table is not linear-additive), while a positive control
+(a genuinely additive table) is picked up exactly: `c=(1,1,−1,0)`, gap ~9e14.
+The machine sees what is there and says what isn't.
+
 ## Roadmap
 
 The three repositories below are, in effect, **three backends of one total-arithmetic contract** (CPU / GPU / hardware). A planned next step is a **pluggable backend** so this model can run its total arithmetic on any of them:
