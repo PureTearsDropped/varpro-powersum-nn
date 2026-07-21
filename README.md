@@ -118,3 +118,16 @@ physics-free random data — still zero ⟹ learned nothing). Regression-tested 
 E²=m²+p² and γ²(1−v²)=1 at ±1.000000; poisoned hydrogen where naive SVD dies → E=−0.500000
 rescued; honest refusal on lawless data; complex support — the free Schrödinger equation's
 imaginary unit discovered as a coefficient (ψ_xx/ψ_t = −0.5003i).
+
+### `julia/` — the Julia discovery stack (vendored byte-identical from total-arith-cuda)
+
+`julia/Discovery.jl` is the Julia twin of `implicit_discovery.py`, vendored **byte-identical**
+together with its two dependencies `NestedSeries.jl` (the algebra shelf) and `ScalarTot.jl`
+(audited total-arithmetic scalar) — verify with `diff` against
+[total-arith-cuda](https://github.com/PureTearsDropped/total-arith-cuda)`/julia/`. Run
+`julia julia/Discovery.jl` (stdlib only, no packages). What the Julia side adds over the
+Python twin: **exact derivatives from the shelf itself** — `HDNum` wraps Λ1⊗Λ1 hyperdual
+numbers (the same mathematics inside ForwardDiff.jl) so `exp(-(hdvar(x)^2)/2)` yields exact
+ψ′, ψ″ in ordinary syntax; poison stays pointwise-local (no finite-difference smearing);
+measured: harmonic-oscillator E=0.5 and hydrogen E=−0.5 to ~1e-15 with σ_min ≈ 4e-16, 10
+poisoned points → exactly 10 rows excluded, lawless data honestly refused.
