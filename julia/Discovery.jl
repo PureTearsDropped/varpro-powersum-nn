@@ -23,8 +23,22 @@ module Discovery
 
 import LinearAlgebra
 import Random
-include(joinpath(@__DIR__, "NestedSeries.jl")); using .NestedSeries
-include(joinpath(@__DIR__, "ScalarTot.jl"));   using .ScalarTot
+
+# 依存の解決(vendor しない・本家 total-arith-cuda から 取る):
+#   ① ENV["TOTAL_ARITH_JULIA"] ② 自分の隣(total-arith-cuda 内での実行)
+#   ③ 隣に clone された ../total-arith-cuda/julia (varpro-powersum-nn 等からの実行)
+function _dep(f::String)
+    for d in (get(ENV, "TOTAL_ARITH_JULIA", ""), @__DIR__,
+              joinpath(@__DIR__, "..", "..", "total-arith-cuda", "julia"))
+        isempty(d) && continue
+        p = joinpath(d, f)
+        isfile(p) && return p
+    end
+    error("依存 $f が見つかりません。total-arith-cuda を 隣に clone するか " *
+          "ENV[\"TOTAL_ARITH_JULIA\"] に その julia/ ディレクトリを 指定してください。")
+end
+include(_dep("NestedSeries.jl")); using .NestedSeries
+include(_dep("ScalarTot.jl"));   using .ScalarTot
 
 export HDNum, hdvar, value, d1, d2, build_library, discover, fmt_law
 
