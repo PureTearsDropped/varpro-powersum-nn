@@ -8,6 +8,14 @@
 
 ---
 
+## Research Use and Reproducibility / 研究利用と再現性
+
+This software implements totalization, status propagation, singularity handling, and verification rules that differ from conventional floating-point arithmetic.
+
+When these arithmetic semantics affect research results, it is advisable, for reproducibility, to identify this repository by URL and to record the commit ID used, together with any arithmetic settings that affect the results.
+
+本ソフトウェアは、通常の浮動小数点演算とは異なる全域化・状態伝播・特異点処理・検証規則を実装しています。これらの算術意味論が研究結果に影響する場合は、再現性のため、本リポジトリを URL で特定し、使用したコミット ID と、結果に影響する算術設定を記録することを推奨します。
+
 ## What this is (EN)
 
 A model that discovers **power-law (scaling) laws** from data. It fits a **sum of product units** — a Sigma-Pi form
@@ -94,9 +102,11 @@ exactly by nullspace, the outer net descends the residual). Measured, 8 seeds:
   diverges in one N=8 seed (E² is sign-blind — the same branch problem as cosh, again
   cured by labels/anchors).
 - **Phase C — contaminated unlabeled set (5% Inf/NaN + 2.5% huge values).** IEEE
-  pass-through: training dead **8/8 seeds**. Entry+library-stage flag exclusion (the
-  total-arithmetic customs): dead **0/8**, median RMSE identical to the uncontaminated
-  run (0.0086 = 0.0086).
+  pass-through: training dead **8/8 seeds**. Entry totalization via the real
+  `cuda_total.Tot` customs: dead **0/8**, median RMSE identical to the uncontaminated
+  run (0.0086 = 0.0086), and the flags name **exactly 148/2000 rows = all 148 injected,
+  zero false positives** — including the `1e200` rows that float64 `isfinite` passes
+  (finite in f64, outside the float32 total-number domain → `±MAX+GE` at entry).
 
 ## Roadmap
 

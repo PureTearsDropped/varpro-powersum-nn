@@ -27,6 +27,7 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
+from cuda_total import Tot                    # 全域算術 (total-arith-cuda の 同梱コピー)
 
 DEV = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.set_default_dtype(torch.float64)
@@ -130,15 +131,20 @@ def discover_c(ml, pl, El):
 C_TRUE = np.array([0, 0, 0, 0, -1.0, -1.0, 1.0])         # E²−m²−p²
 
 
+def poison(mu, pu, seed):
+    "5% Inf/NaN + 2.5% 巨大値 (1e200 = f64 では 有限・f32 全域数の 定義域外)。"
+    rs = np.random.default_rng(seed + 999)
+    idx = rs.choice(len(mu), len(mu) // 20, replace=False)
+    mu[idx[::2]] = np.inf
+    pu[idx[1::2]] = np.nan
+    idx2 = rs.choice(len(mu), len(mu) // 40, replace=False)
+    mu[idx2] = 1e200
+
+
 def fit(seed, n_lab, arm, contaminate=False, honesty="ieee", lam=1.0):
     (ml, pl, El), (mu, pu), (mt, pt, Et) = make_data(seed, n_lab)
-    if contaminate:                                       # 5% Inf/NaN + 2.5% 巨大値
-        rs = np.random.default_rng(seed + 999)
-        idx = rs.choice(len(mu), len(mu) // 20, replace=False)
-        mu[idx[::2]] = np.inf
-        pu[idx[1::2]] = np.nan
-        idx2 = rs.choice(len(mu), len(mu) // 40, replace=False)
-        mu[idx2] = 1e200                                  # 入口は 有限・E² で 爆発する 種
+    if contaminate:
+        poison(mu, pu, seed)
     if arm == "discovered":
         c, _ = discover_c(ml, pl, El)
     elif arm == "oracle":
@@ -150,23 +156,25 @@ def fit(seed, n_lab, arm, contaminate=False, honesty="ieee", lam=1.0):
     net = mlp(inp=2)
     tl = torch.tensor(np.stack([ml, pl], 1), device=DEV)
     yl = torch.tensor(El, device=DEV).reshape(-1, 1)
-    tu = torch.tensor(np.stack([mu, pu], 1), device=DEV)
     ct = None if c is None else torch.tensor(c, device=DEV)
 
-    keep = None
     if c is not None and honesty == "flags":
-        # 入口の 税関: 非有限を 名指し (全域算術の 入口 全域化と 同じ 役)
-        keep = torch.isfinite(tu).all(1)
+        # 入口の 税関 = cuda_total.Tot (本物): NaN→(0, GE|LE|SUNK)・±Inf と
+        # f32 範囲外 (1e200 含む — f64 では 有限なので isfinite では 捕れない) → ±MAX+GE。
+        # フラグの 立った 行を 名指しで 除外し、通った 行は 全域化済みの 値を 使う。
+        tm = Tot(torch.tensor(mu, device=DEV))
+        tp = Tot(torch.tensor(pu, device=DEV))
+        keep = (tm.flag | tp.flag) == 0
+        tu = torch.stack([tm.val.double(), tp.val.double()], 1)[keep]
+    else:
+        tu = torch.tensor(np.stack([mu, pu], 1), device=DEV)
 
     def loss(net):
         l = (net(tl) - yl).pow(2).mean()
         if ct is not None:
-            t = tu if keep is None else tu[keep]
-            Eh = net(t).squeeze(-1)
-            Th = library(t[:, 0], t[:, 1], Eh)
+            Eh = net(tu).squeeze(-1)
+            Th = library(tu[:, 0], tu[:, 1], Eh)
             r = (Th * ct).sum(-1)
-            if keep is not None:                          # ライブラリ段の 税関 (E² 爆発 等)
-                r = r[torch.isfinite(r)]
             l = l + lam * r.pow(2).mean()
         return l
     train(loss, net, steps=2000)
@@ -196,6 +204,12 @@ def phase_b():
 
 def phase_c():
     print("\nPhase C — 無ラベル集合を 汚染 (5% Inf/NaN + 2.5% 巨大値)・N=32・8 シード")
+    _, (mu, pu), _ = make_data(0, 32)
+    poison(mu, pu, 0)
+    tm = Tot(torch.tensor(mu, device=DEV)); tp = Tot(torch.tensor(pu, device=DEV))
+    named = int(((tm.flag | tp.flag) > 0).sum())
+    bad = int((~(np.isfinite(mu) & np.isfinite(pu) & (np.abs(mu) < 3.4e38))).sum())
+    print(f"  入口の 税関 (cuda_total.Tot) が 名指した 行: {named}/2000 (注入 {bad} — 1e200 も 名指し)")
     for honesty, lab in (("ieee", "IEEE 素通し"), ("flags", "フラグ除外")):
         r = [fit(s, 32, "discovered", contaminate=True, honesty=honesty)
              for s in range(8)]
