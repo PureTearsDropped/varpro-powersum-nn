@@ -20,6 +20,7 @@
 
   規律: 8 シード + 最悪ケース・負けも そのまま 印字。λ は 未調整 (1.0/0.3/0.3 固定)。
 """
+import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -30,10 +31,23 @@ torch.set_default_dtype(torch.float64)
 M = 16
 
 
+def fourier_table():
+    "ℤ/16 の 指標表 (実フーリエ): 課題と 一致する 固定 基底 — m 値の 法則の 巡回版。"
+    a = torch.arange(M, dtype=torch.float64)
+    cols = []
+    for k in range(M // 2):
+        cols.append(torch.cos(2 * math.pi * k * a / M))
+        cols.append(torch.sin(2 * math.pi * k * a / M))
+    return torch.stack(cols, 1)
+
+
 class Model(nn.Module):
-    def __init__(self, d=16, width=64):
+    def __init__(self, d=16, width=64, basis="free"):
         super().__init__()
-        self.E = nn.Parameter(0.3 * torch.randn(M, d))
+        if basis == "fourier":
+            self.register_buffer("E", fourier_table().to(DEV))
+        else:
+            self.E = nn.Parameter(0.3 * torch.randn(M, d))
         self.h = nn.Sequential(nn.Linear(2 * d, width), nn.Tanh(),
                                nn.Linear(width, width), nn.Tanh(),
                                nn.Linear(width, d))
@@ -45,7 +59,7 @@ class Model(nn.Module):
         return self.compose(self.E[a], self.E[b]) @ self.E.T
 
 
-def run_one(seed, frac, axioms):
+def run_one(seed, frac, axioms, basis="free"):
     rs = np.random.default_rng(seed)
     pairs = np.array([(a, b) for a in range(M) for b in range(M)])
     perm = rs.permutation(len(pairs))
@@ -57,7 +71,7 @@ def run_one(seed, frac, axioms):
     ec = (ea + eb) % M
 
     torch.manual_seed(seed)
-    net = Model().to(DEV)
+    net = Model(basis=basis).to(DEV)
     # AdamW + weight decay + 長め: 群課題の 汎化は grokking 域 (wd なしだと 基準腕が
     # 記憶のまま 終わり 不当に 弱く 見える) — 両腕 同条件
     opt = torch.optim.AdamW(net.parameters(), lr=3e-3, weight_decay=1e-2)
@@ -82,19 +96,20 @@ def run_one(seed, frac, axioms):
     return acc, net
 
 
+ARMS = [("free", False, "基準"), ("free", True, "公理"),
+        ("fourier", False, "フーリエ基底"), ("fourier", True, "基底+公理")]
+
 def part1():
-    print("① 公理を 無ラベルの 先生に (ℤ/16 加法・テスト正解率・8 シード)")
-    print(f"   {'frac':>5} {'基準(中央値/最悪)':>20} {'公理あり(中央値/最悪)':>22}")
-    nets = {}
+    print("① 課し場所の 対決 (ℤ/16 加法・テスト正解率 中央値/最悪・8 シード)")
+    print("   基準=自由埋め込み / 公理=損失に法則 / フーリエ基底=一致する入力基底(指標表)")
+    hdr = " ".join(f"{lab:>16}" for _, _, lab in ARMS)
+    print(f"   {'frac':>5} {hdr}")
     for frac in (0.15, 0.3, 0.5):
-        row = {}
-        for ax in (False, True):
-            accs = sorted(run_one(s, frac, ax)[0] for s in range(8))
-            row[ax] = (accs[4], accs[0])
-        nets[frac] = row
-        print(f"   {frac:>5} {row[False][0]:>9.3f}/{row[False][1]:>8.3f}"
-              f" {row[True][0]:>11.3f}/{row[True][1]:>8.3f}")
-    return nets
+        cells = []
+        for basis, ax, _ in ARMS:
+            accs = sorted(run_one(s, frac, ax, basis)[0] for s in range(8))
+            cells.append(f"{accs[4]:>8.3f}/{accs[0]:>5.3f}")
+        print(f"   {frac:>5} " + "  ".join(cells))
 
 
 def part2():

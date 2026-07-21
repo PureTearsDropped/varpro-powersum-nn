@@ -118,16 +118,24 @@ the group **axioms** — commutativity, associativity, identity — applied as f
 equation losses on *unlabeled* pairs. Measured (8 seeds, AdamW + weight decay, both arms
 identical):
 
-| labeled frac | baseline (median/worst) | + axioms (median/worst) |
-|---|---|---|
-| 0.15 | 0.009 / 0.000 | **0.252** / 0.225 |
-| 0.30 | 0.000 / 0.000 | **0.356** / 0.328 |
-| 0.50 | 0.000 / 0.000 | **0.570** / 0.477 |
+Four arms: free embedding / + axiom losses / fixed **Fourier embedding** (the ℤ/16
+character table — the matching input basis) / basis + axioms:
 
-The baseline memorizes and never generalizes (below chance = 1/16); the axiom teacher
-lifts every seed. Structure imposed as *law-in-the-loss* wins exactly where structure
-imposed as *architecture* loses — consistent with the matching-structure × scarce-data
-rule, at a new site of imposition. Second half: the discovery machine pointed at the
+| labeled frac | free | + axioms | Fourier basis | basis + axioms |
+|---|---|---|---|---|
+| 0.15 | 0.009/0.000 | **0.252**/0.225 | 0.005/0.000 | **0.261**/0.234 |
+| 0.30 | 0.000/0.000 | **0.356**/0.328 | 0.000/0.000 | **0.356**/0.328 |
+| 0.50 | 0.000/0.000 | **0.570**/0.477 | 0.000/0.000 | 0.523/0.461 |
+
+Two surprises, both honest: (1) in this **composition** architecture (two tokens
+composed by a learned MLP), the matching input basis alone is *dead* — diagnostic at
+frac 0.9: train accuracy 1.000, test 0.000 for both free and Fourier arms (pure
+memorization wall; the composer is free to memorize regardless of the basis handed to
+it). The earlier "matching basis + plain MLP ≈ 1.00" result was single-input function
+fitting — a different site. (2) The axiom losses are the **only** thing that breaks the
+wall here, and given axioms, the basis is redundant-to-slightly-harmful. Caveats: the
+axiom ceiling (0.57 at frac 0.5) is far from 1.00, λ untuned, and no grokking-length
+training was attempted. Second half: the discovery machine pointed at the
 learned embedding table honestly **refuses** the additive law `E[a]+E[b]=E[a+b]`
 (gap 1.0 — the learned table is not linear-additive), while a positive control
 (a genuinely additive table) is picked up exactly: `c=(1,1,−1,0)`, gap ~9e14.
