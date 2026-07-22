@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below (see also the Research Use and Reproducibility section of the README: please record the commit ID and any arithmetic settings that affect results)."
+type: software
+title: "varpro-powersum-nn: Sigma-Pi power-law regression with totalized gradients"
+authors:
+  - name: "PureTearsDropped"
+license: 0BSD
+repository-code: "https://github.com/PureTearsDropped/varpro-powersum-nn"
+abstract: "Power-law (scaling-law) discovery as a sum of product units with variable projection: linear coefficients solved in closed form, learned exponents snapped to dyadic rationals only when an F-test supports it. Gradients are totalized so poisoned data cannot produce NaN/Inf, and saturation flags double as an automatic outlier detector. Includes implicit law discovery (nullspace laws with gap certificates and tautology detection)."
+keywords:
+  - "symbolic regression"
+  - "power laws"
+  - "variable projection"
+  - "total arithmetic"
+  - "robust training"
+  - "law discovery"
