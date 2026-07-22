@@ -34,14 +34,31 @@ def load_corpus():
     return torch.tensor([idx[c] for c in text], dtype=torch.long, device=DEV), chars
 
 
+class BilinFFN(nn.Module):
+    "⊙サンドイッチ: W₃(W₁x ⊙ W₂x)。掛け算は 回路で 焼き、前後の 写像だけ 学ぶ。"
+    def __init__(self, w, gated=False):
+        super().__init__()
+        self.a = nn.Linear(D, w)
+        self.b = nn.Linear(D, w)
+        self.o = nn.Linear(w, D)
+        self.gated = gated                         # gated=True → GLU (⊙ の 片腕に GELU)
+
+    def forward(self, x):
+        u = self.a(x)
+        v = self.b(x)
+        return self.o(u * (F.gelu(v) if self.gated else v))
+
+
 class Block(nn.Module):
-    def __init__(self):
+    def __init__(self, ffn="gelu"):
         super().__init__()
         self.ln1 = nn.LayerNorm(D)
         self.qkv = nn.Linear(D, 3 * D)
         self.proj = nn.Linear(D, D)
         self.ln2 = nn.LayerNorm(D)
-        self.ff = nn.Sequential(nn.Linear(D, FW), nn.GELU(), nn.Linear(FW, D))
+        w2 = 2 * FW // 3                           # パラメタ数を ほぼ 揃える (2·D·FW ≈ 3·D·w2)
+        self.ff = (nn.Sequential(nn.Linear(D, FW), nn.GELU(), nn.Linear(FW, D))
+                   if ffn == "gelu" else BilinFFN(w2, gated=(ffn == "glu")))
 
     def forward(self, x, jets=None):
         B, T, _ = x.shape
@@ -57,11 +74,11 @@ class Block(nn.Module):
 
 
 class TinyGPT(nn.Module):
-    def __init__(self, V):
+    def __init__(self, V, ffn="gelu"):
         super().__init__()
         self.E = nn.Parameter(0.1 * torch.randn(V, D))
         self.pos = nn.Parameter(0.02 * torch.randn(CTX, D))
-        self.blocks = nn.ModuleList(Block() for _ in range(NL))
+        self.blocks = nn.ModuleList(Block(ffn) for _ in range(NL))
         self.lnf = nn.LayerNorm(D)
 
     def forward(self, ix, jets=None):
@@ -78,9 +95,9 @@ def windows(data, n, rng):
     return ix, y
 
 
-def train_model(tr, V, seed=0, steps=STEPS):
+def train_model(tr, V, seed=0, steps=STEPS, ffn="gelu"):
     torch.manual_seed(seed)
-    net = TinyGPT(V).to(DEV)
+    net = TinyGPT(V, ffn).to(DEV)
     opt = torch.optim.AdamW(net.parameters(), lr=3e-3, weight_decay=1e-2)
     sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, steps)
     rng = torch.Generator(device=DEV).manual_seed(seed)
@@ -180,5 +197,28 @@ def main():
     probe("未学習 (乱数)", collect_jets(fresh, va), ln_params(fresh))
 
 
+def ffn_shootout():
+    "FFN の 焼き加減 対決: GELU MLP / ⊙サンドイッチ (活性化なし) / GLU。2 シード。"
+    data, chars = load_corpus()
+    V = len(chars)
+    n_tr = int(0.9 * len(data))
+    tr, va = data[:n_tr], data[n_tr:]
+    print("FFN 対決 (パラメタ ほぼ 同数・2 シード・held-out bpc)")
+    for ffn, lab in (("gelu", "GELU MLP (基準)"), ("bilinear", "⊙サンドイッチ (活性化なし)"),
+                     ("glu", "GLU (⊙+ゲート)")):
+        bpcs = []
+        for seed in (0, 1):
+            net = train_model(tr, V, seed=seed, ffn=ffn)
+            rng = torch.Generator(device=DEV).manual_seed(99)
+            with torch.no_grad():
+                ix, y = windows(va, 500, rng)
+                bpcs.append(float(F.cross_entropy(net(ix).reshape(-1, V),
+                                                  y.reshape(-1))) / math.log(2))
+        print(f"  {lab:<24} {bpcs[0]:.3f} / {bpcs[1]:.3f} bpc")
+
+
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "ffn":
+        ffn_shootout()
+    else:
+        main()

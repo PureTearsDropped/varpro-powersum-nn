@@ -173,6 +173,13 @@ property, not an input–output law) and an untrained-model control:
   to language as-is). Embedding table: no exact linear law either (gap 1.8), while the
   composer's output does live near the embedding manifold (median cos(h, E[next]) 0.437
   vs −0.096 random).
+- **FFN bake-off** (`implicit_transformer.py ffn`; param-matched, 2 seeds): GELU MLP
+  2.283/2.274 bpc, **pure bilinear ⊙-sandwich `W₃(W₁x ⊙ W₂x)` with *no activation
+  function* 2.294/2.295**, GLU 2.299/2.282 — a three-way tie within noise. Notable
+  positive: multiplication alone supplies all the nonlinearity an FFN needs at this
+  scale. Notable law-consistency: the same baked-⊙ intervention that is *decisive* on
+  the matched task (ℤ/16: 0 → 1.000) is *neutral* on language — matching-structure ×
+  scarce-data, demonstrated on both sides in one experiment family.
 
 ## Roadmap
 
