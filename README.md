@@ -135,7 +135,17 @@ it). The earlier "matching basis + plain MLP ≈ 1.00" result was single-input f
 fitting — a different site. (2) The axiom losses are the **only** thing that breaks the
 wall here, and given axioms, the basis is redundant-to-slightly-harmful. Caveats: the
 axiom ceiling (0.57 at frac 0.5) is far from 1.00, λ untuned, and no grokking-length
-training was attempted. Second half: the discovery machine pointed at the
+training was attempted.
+
+Follow-up (inspired by the LayerNorm rediscovery): **bake a law into the architecture**
+— a symmetrized composer `(h(x,y)+h(y,x))/2` makes commutativity hold *exactly*,
+LayerNorm-style. Measured: baking the law alone lifts 0 → 0.147/0.278/0.453 — the first
+architecture-imposition win in this setting (**baking the law works where baking the
+basis was dead**); the hybrid (baked commutativity + assoc/identity losses) *ties* the
+loss-only arm at scarce fractions (0.252/0.356) and slightly trails its median at 0.5
+(0.531 vs 0.570, with a better worst seed). Refined site-of-imposition map:
+representation-baking dead < law-baking partial < law-in-loss strongest here — with the
+architectural side's unique good being *exactness*, not reach. Second half: the discovery machine pointed at the
 learned embedding table honestly **refuses** the additive law `E[a]+E[b]=E[a+b]`
 (gap 1.0 — the learned table is not linear-additive), while a positive control
 (a genuinely additive table) is picked up exactly: `c=(1,1,−1,0)`, gap ~9e14.

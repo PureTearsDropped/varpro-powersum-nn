@@ -42,8 +42,9 @@ def fourier_table():
 
 
 class Model(nn.Module):
-    def __init__(self, d=16, width=64, basis="free"):
+    def __init__(self, d=16, width=64, basis="free", sym=False):
         super().__init__()
+        self.sym = sym                             # 可換律を アーキに 焼く (LayerNorm 式)
         if basis == "fourier":
             self.register_buffer("E", fourier_table().to(DEV))
         else:
@@ -53,13 +54,15 @@ class Model(nn.Module):
                                nn.Linear(width, d))
 
     def compose(self, x, y):
+        if self.sym:                               # h(x,y)=h(y,x) が 厳密に 成立
+            return 0.5 * (self.h(torch.cat([x, y], -1)) + self.h(torch.cat([y, x], -1)))
         return self.h(torch.cat([x, y], -1))
 
     def logits(self, a, b):
         return self.compose(self.E[a], self.E[b]) @ self.E.T
 
 
-def run_one(seed, frac, axioms, basis="free"):
+def run_one(seed, frac, axioms, basis="free", sym=False):
     rs = np.random.default_rng(seed)
     pairs = np.array([(a, b) for a in range(M) for b in range(M)])
     perm = rs.permutation(len(pairs))
@@ -71,7 +74,7 @@ def run_one(seed, frac, axioms, basis="free"):
     ec = (ea + eb) % M
 
     torch.manual_seed(seed)
-    net = Model(basis=basis).to(DEV)
+    net = Model(basis=basis, sym=sym).to(DEV)
     # AdamW + weight decay + 長め: 群課題の 汎化は grokking 域 (wd なしだと 基準腕が
     # 記憶のまま 終わり 不当に 弱く 見える) — 両腕 同条件
     opt = torch.optim.AdamW(net.parameters(), lr=3e-3, weight_decay=1e-2)
