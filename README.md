@@ -141,6 +141,29 @@ learned embedding table honestly **refuses** the additive law `E[a]+E[b]=E[a+b]`
 (a genuinely additive table) is picked up exactly: `c=(1,1,−1,0)`, gap ~9e14.
 The machine sees what is there and says what isn't.
 
+## `implicit_charlm.py` / `implicit_transformer.py` — the discovery machine on real language models
+
+Real corpora only via the `CORPUS` env var (no hardcoded text). Two models, measured on
+tinyshakespeare: a tied-embedding FNN-only LM (concat last-8 chars → MLP → `Eᵀ`; Bengio-2003
+wiring) reaches **2.45 bpc**, and a TinyGPT (2 layers, 4 heads, d=64, ctx 64) reaches
+**2.30 bpc** (unigram baseline 4.77) — the FNN-only number serves as the no-attention
+control. The discovery machine pointed at the trained jets, with pre-registered gap
+threshold (>10), a shuffle control (break the x↔y pairing; whatever survives is a marginal
+property, not an input–output law) and an untrained-model control:
+
+- **It blind-rediscovered LayerNorm.** The FFN-block input jets satisfy one exact linear
+  law (gap ~7×10⁵): coefficient mass 100% on the x side, survives shuffling (a property
+  of x alone), present in trained *and* untrained models — and its coefficient vector
+  matches the LayerNorm prediction `c ∝ (1/γ, 0, −Σβ/γ)` with **cos = 1.0000**. The
+  machine found the law the *architecture* baked in, and the anatomy identified it.
+- **The learned computation itself refuses low-order laws.** Quadratic library on the
+  top-8 PCA subspace of (x, y): gaps 1.3–3.0 everywhere, trained ≈ untrained,
+  shuffle-control equal — an honest certificate that the language FFN is not a
+  degree-≤2 algebra in its principal subspace (the ℤ/16 axiom story does *not* transfer
+  to language as-is). Embedding table: no exact linear law either (gap 1.8), while the
+  composer's output does live near the embedding manifold (median cos(h, E[next]) 0.437
+  vs −0.096 random).
+
 ## Roadmap
 
 The three repositories below are, in effect, **three backends of one total-arithmetic contract** (CPU / GPU / hardware). A planned next step is a **pluggable backend** so this model can run its total arithmetic on any of them:
